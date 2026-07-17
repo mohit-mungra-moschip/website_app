@@ -19,7 +19,7 @@ def contact():
 def submit():
 
     name = request.form.get("name")
-    email = request.form.get("email")
+    email = request.form.get("emai")
     message = request.form.get("message")
 
     if not name or not email or not message:
