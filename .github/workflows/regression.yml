@@ -82,7 +82,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ inputs.test_repo || 'mohit-mungra-moschip/website_tests' }}
-          token: ${{ secrets.TEST_REPO_TOKEN || github.token }}
+          token: ${{ secrets.TEST_TOKEN_REPO || github.token }}
           path: test_framework
           fetch-depth: 20
 
@@ -317,8 +317,8 @@ jobs:
       - name: PR for Test Framework Fixes
         if: always()
         env:
-          # In monorepo mode use built-in GITHUB_TOKEN; in dual-repo use TEST_REPO_TOKEN
-          GITHUB_TOKEN: ${{ inputs.monorepo_mode == true && secrets.GITHUB_TOKEN || (secrets.TEST_REPO_TOKEN || secrets.GITHUB_TOKEN) }}
+          # In monorepo mode use built-in GITHUB_TOKEN; in dual-repo use TEST_TOKEN_REPO
+          GITHUB_TOKEN: ${{ inputs.monorepo_mode == true && secrets.GITHUB_TOKEN || (secrets.TEST_TOKEN_REPO || secrets.GITHUB_TOKEN) }}
         run: |
           HEALING_TYPE="${{ steps.ai_pipeline.outputs.healing_type }}"
           MONOREPO="${{ inputs.monorepo_mode }}"
