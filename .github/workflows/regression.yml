@@ -99,13 +99,12 @@ jobs:
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
-          # In monorepo mode requirements.txt is at root; otherwise inside test_framework/
-          if [ "${{ inputs.monorepo_mode }}" = "true" ]; then
-            REQ_FILE="requirements.txt"
-          else
-            REQ_FILE="test_framework/requirements.txt"
+          # Always install app dependencies
+          pip install -r requirements.txt
+          # Install test framework dependencies if in dual-repo mode
+          if [ "${{ inputs.monorepo_mode }}" != "true" ] && [ -f "test_framework/requirements.txt" ]; then
+            pip install -r test_framework/requirements.txt
           fi
-          pip install -r "$REQ_FILE"
           pip install pytest-json-report
 
       # ── Database Setup ──────────────────────────────────────────────────────
@@ -147,8 +146,17 @@ jobs:
           esac
 
           echo "Mode: ${{ inputs.monorepo_mode == true && 'MONOREPO' || 'DUAL-REPO' }}  |  Test Path: $TEST_PATH"
+          
+          # Start Flask app in background
+          python app.py &
+          FLASK_PID=$!
+          sleep 3
+          
           pytest "$TEST_PATH" -v --tb=short --json-report --json-report-file=reports/test_results.json 2>&1 | tee reports/raw_output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+          
+          # Kill Flask app
+          kill $FLASK_PID || true
 
       # ── Run AI Analysis & Self-Healing ──────────────────────────────────────
       - name: Run AI Regression Analysis Pipeline
@@ -200,6 +208,19 @@ jobs:
             *)                          TEST_PATH="${TEST_ROOT}/" ;;
           esac
 
+          # Create .env file for the AI pipeline
+          cat <<EOF > .env
+          GROQ_API_KEY=${GROQ_API_KEY}
+          ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+          GEMINI_API_KEY=${GEMINI_API_KEY}
+          OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+          EOF
+
+          # Start Flask app in background
+          python app.py &
+          FLASK_PID=$!
+          sleep 3
+
           # Run AI regression runner (path differs by mode)
           python "$RUNNER" \
             --project-path "." \
@@ -208,6 +229,9 @@ jobs:
             --ci-mode \
             --max-iter "${{ inputs.max_healing_iterations || '3' }}" \
             --create-jira "${{ inputs.create_jira_tickets != 'false' && 'true' || 'true' }}"
+            
+          # Kill Flask app
+          kill $FLASK_PID || true
           # Generate dynamic Pull Request descriptions (includes Jira links & healing info)
           python3 pr_body_generator.py
           HEALING_TYPE=$(python3 -c "import json; d=json.load(open('reports/ai_summary.json')); print(d.get('healing_type', 'NONE'))" 2>/dev/null || echo "NONE")
