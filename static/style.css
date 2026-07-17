@@ -1,0 +1,10 @@
+body{
+    font-family: Arial;
+    margin:40px;
+}
+
+input,textarea{
+    display:block;
+    width:300px;
+    margin:10px 0;
+}
